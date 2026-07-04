@@ -1,97 +1,79 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import math
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.metrics import accuracy_score, classification_report
+from matplotlib import pyplot as plt
 
-# ---------------------------------------------------------
-# Load the dataset directly from a public source
-# ---------------------------------------------------------
-url = "https://raw.githubusercontent.com/codebasics/py/master/ML/7_logistic_reg/Exercise/HR_comma_sep.csv"
-df = pd.read_csv(url)
-
-print("--- Dataset Preview ---")
-print(df.head())
-print("\n--- Column Info & Missing Values ---")
-print(df.info())
-
-# ---------------------------------------------------------
-# 1. Exploratory Data Analysis (EDA)
-# ---------------------------------------------------------
-# Let's check the average metrics for employees who left vs. stayed
-print("\n--- Average Metrics by Retention (left) ---")
-print(df.groupby('left').mean(numeric_only=True))
-
-"""
-EDA Insights from the averages:
-1. Satisfaction Level: Significantly lower for employees who left (~0.44 vs ~0.66).
-2. Average Monthly Hours: Higher for employees who left (~207 vs ~199).
-3. Promotion Last 5 Years: Employees who stayed were more likely to have been promoted.
-"""
-
-# ---------------------------------------------------------
-# 2. Bar chart: Impact of Salary on Retention
-# ---------------------------------------------------------
-plt.figure(figsize=(8, 5))
-sns.countplot(x='salary', hue='left', data=df, palette='Set2')
-plt.title('Employee Retention by Salary Level')
-plt.xlabel('Salary')
-plt.ylabel('Number of Employees')
-plt.legend(['Stayed', 'Left'])
-plt.show()
-
-# ---------------------------------------------------------
-# 3. Bar chart: Correlation between Department and Retention
-# ---------------------------------------------------------
-plt.figure(figsize=(12, 6))
-sns.countplot(x='Department', hue='left', data=df, palette='viridis')
-plt.title('Employee Retention by Department')
-plt.xlabel('Department')
-plt.ylabel('Number of Employees')
-plt.xticks(rotation=45)
-plt.legend(['Stayed', 'Left'])
-plt.tight_layout()
-plt.show()
-
-# ---------------------------------------------------------
-# 4. Feature Selection & Model Building
-# ---------------------------------------------------------
-# Based on EDA, we select impactful features:
-# Quantitative: satisfaction_level, average_montly_hours, promotion_last_5years
-# Categorical (to be encoded): salary, Department
-X = df[['satisfaction_level', 'average_montly_hours', 'promotion_last_5years', 'salary', 'Department']]
-y = df['left']
-
-# Handle Categorical Variables using One-Hot Encoding via ColumnTransformer
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('cat', OneHotEncoder(drop='first'), ['salary', 'Department'])
-    ],
-    remainder='passthrough'
+#Page Configuration
+st.set_page_config(
+    page_title="Insurance Purchase Prediction",
+    page_icon="💵",
+    layout="centered"
 )
 
-# Transform features
-X_processed = preprocessor.fit_transform(X)
+st.title("Insurance Purchase Prediction")
+st.write("Predict Insurance Purchase using Logistic Regression")
 
-# Split data into training and testing sets (80% train, 20% test)
-X_train, X_test, y_train, y_test = train_test_split(X_processed, y, test_size=0.2, random_state=42)
+# 1. Load Data
+# Note: Ensure "insurance_data.csv" is in the same directory as this script!
+try:
+    df = pd.read_csv("insurance_data.csv")
+    st.write("### Dataset Preview", df.head())
+except FileNotFoundError:
+    st.error("Please place 'insurance_data.csv' in the same folder as this script.")
+    st.stop()
 
-# Initialize and train the Logistic Regression Model
-# Increasing max_iter ensures the solver converges
-model = LogisticRegression(max_iter=1000)
+# 2. Plotting the Data in Streamlit
+st.write("### Age vs Insurance Purchase Visualization")
+fig, ax = plt.subplots()
+ax.scatter(df.age, df.bought_insurance, marker='+', color='red')
+ax.set_xlabel("Age")
+ax.set_ylabel("Bought Insurance (1=Yes, 0=No)")
+st.pyplot(fig)
+
+# 3. Train Test Split (Locked with random_state for consistency)
+X_train, X_test, y_train, y_test = train_test_split(
+    df[['age']], 
+    df.bought_insurance, 
+    train_size=0.8, 
+    random_state=42
+)
+
+# 4. Model Training
+model = LogisticRegression()
 model.fit(X_train, y_train)
 
-# ---------------------------------------------------------
-# 5. Measure Accuracy
-# ---------------------------------------------------------
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
+# 5. Model Evaluation
+st.write("### Model Performance")
+st.write(f"**Model Accuracy Score:** {model.score(X_test, y_test):.2f}")
 
-print("\n--- Model Evaluation ---")
-print(f"Model Accuracy: {accuracy * 100:.2f}%")
-print("\nClassification Report:")
-print(classification_report(y_test, y_pred))
+# Extracting dynamic coefficients so manual math always matches the model
+m = model.coef_[0][0]
+b = model.intercept_[0]
+
+st.write("### Model Parameters")
+st.write(f"**Coefficient (m):** {m:.4f}")
+st.write(f"**Intercept (b):** {b:.4f}")
+
+# 6. Manual Math & Sigmoid Function
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+def prediction_function(age):
+    # y = mx + b
+    z = m * age + b 
+    y = sigmoid(z)
+    return y
+
+# 7. Interactive Prediction UI
+st.write("### Try Your Own Prediction")
+user_age = st.number_input("Enter Age:", min_value=1, max_value=100, value=35)
+probability = prediction_function(user_age)
+
+st.write(f"Calculated Probability: **{probability:.3f}**")
+if probability >= 0.5:
+    st.success(f"With a probability of {probability:.3f}, a person aged {user_age} **will** buy insurance.")
+else:
+    st.warning(f"With a probability of {probability:.3f}, a person aged {user_age} **will not** buy insurance.")
