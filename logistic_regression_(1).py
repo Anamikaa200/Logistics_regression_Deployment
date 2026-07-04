@@ -14,7 +14,7 @@ Above is a binary logistic regression problem as there are only two possible out
 # Commented out IPython magic to ensure Python compatibility.
 import streamlit as st
 import pandas as pd
-from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from matplotlib import pyplot as plt
 # %matplotlib inline
